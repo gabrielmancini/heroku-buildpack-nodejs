@@ -111,7 +111,7 @@ function cat_npm_debug_log() {
 trap cat_npm_debug_log EXIT
 
 bootstrap_node=$(mktmpdir bootstrap_node)
-package_download "nodejs" "0.4.7" $bootstrap_node
+package_download "nodejs" "0.11.3" $bootstrap_node
 
 # make some associative arrays
 declare -A engine_versions
