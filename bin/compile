@@ -12,6 +12,7 @@ unset GIT_DIR
 
 # config
 SCONS_VERSION="1.2.0"
+S3_HEROKU_BUCKET="heroku-buildpack-nodejs"
 S3_BUCKET="engine.bilgow.com"
 
 # parse and derive params
@@ -52,7 +53,7 @@ function run_npm() {
 }
 
 function manifest_versions() {
-  curl "http://${S3_BUCKET}.s3.amazonaws.com/manifest.${1}" -s -o - | tr -s '\n' ' '
+  curl "http://${S3_HEROKU_BUCKET}.s3.amazonaws.com/manifest.${1}" -s -o - | tr -s '\n' ' '
 }
 
 function resolve_version() {
@@ -64,12 +65,11 @@ function resolve_version() {
   for version in $available_versions; do args="${args} -v \"${version}\""; done
 
   if [ "$2" == "" ]; then
-    args="${args} -r \"${default_version}\"";
+    args="${args} -v \"${default_version}\"";
   else
-    args="${args} -r \"${requested_version}\"";
+    args="${args} -v \"${requested_version}\"";
   fi
 
-  echo "args from version $args"
   evaluated_versions=$(eval $bootstrap_node/bin/node $LP_DIR/vendor/node-semver/bin/semver ${args} || echo "")
   echo "$evaluated_versions" | tail -n 1
 }
@@ -96,9 +96,13 @@ function package_download() {
   engine="$1"
   version="$2"
   location="$3"
+  bucket="$4"
+  if [ "$4" == "" ]; then
+    bucket="${S3_BUCKET}"
+  fi
 
   mkdir -p $location
-  package="http://${S3_BUCKET}.s3.amazonaws.com/$engine-$version.tgz"
+  package="http://$bucket.s3.amazonaws.com/$engine-$version.tgz"
   echo "Download package from $package"
   curl $package -s -o - | tar xzf - -C $location
 }
@@ -150,8 +154,8 @@ CACHE_TARGET_DIR="$BUILD_DIR/node_modules"
 
 # s3 packages
 NODE_PACKAGE="http://${S3_BUCKET}.s3.amazonaws.com/nodejs-${NODE_VERSION}.tgz"
-NPM_PACKAGE="http://${S3_BUCKET}.s3.amazonaws.com/npm-${NPM_VERSION}.tgz"
-SCONS_PACKAGE="http://${S3_BUCKET}.s3.amazonaws.com/scons-${SCONS_VERSION}.tgz"
+NPM_PACKAGE="http://${S3_HEROKU_BUCKET}.s3.amazonaws.com/npm-${NPM_VERSION}.tgz"
+SCONS_PACKAGE="http://${S3_HEROKU_BUCKET}.s3.amazonaws.com/scons-${SCONS_VERSION}.tgz"
 
 # vendor directories
 VENDORED_NODE="$(mktmpdir node)"
@@ -161,8 +165,8 @@ VENDORED_SCONS="$(mktmpdir scons)"
 # download and unpack packages
 echo "-----> Fetching Node.js binaries"
 package_download "nodejs" "${NODE_VERSION}" "${VENDORED_NODE}"
-package_download "npm" "${NPM_VERSION}" "${VENDORED_NPM}"
-package_download "scons" "${SCONS_VERSION}" "${VENDORED_SCONS}"
+package_download "npm" "${NPM_VERSION}" "${VENDORED_NPM}" "${S3_HEROKU_BUCKET}"
+package_download "scons" "${SCONS_VERSION}" "${VENDORED_SCONS}" "${S3_HEROKU_BUCKET}"
 
 # vendor node into the slug
 PATH="$BUILD_DIR/bin:$PATH"
